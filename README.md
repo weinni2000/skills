@@ -6,7 +6,8 @@ Agent skills (Claude Code, Codex, and other agents that read `SKILL.md`) for Odo
 | --- | --- |
 | [`oca_migration_git`](skills/oca_migration_git/SKILL.md) | OCA-style module migration (default 19.0 → 20.0): replay the history with `git format-patch \| git am`, squash bot commits, pre-commit commit, `[MIG]` commit, review PR in your fork. Includes a list of Odoo 20 changes seen in real migrations. |
 | [`oca_pr_checks`](skills/oca_pr_checks/SKILL.md) | Read failing OCA CI checks of a PR, reproduce them locally, fix and amend into the `[MIG]` commit. |
-| [`odoo-translations`](skills/odoo-translations/SKILL.md) | Find strings that can't be translated (JS without `_t()`, `t-att-*` expressions, …), fix them, export the POT, write the `.po`, verify. Ships a scanner script. |
+| [`oca_cla_reminder`](skills/oca_cla_reminder/SKILL.md) | Find OCA PRs with a failing CLA check, identify the unsigned commit authors and remind them by @-mention or email. |
+| [`odoo-translations`](skills/odoo-translations/SKILL.md) | Find strings that can't be translated (JS without `_t()`, `t-att-*` expressions, …), fix them, export the POT from Odoo, merge it and fill only the `msgstr` with a checker that keeps placeholders and markup intact, verify. Ships a scanner and `po_tool.py` (merge / todo / fill). |
 | [`odoo-house-rules`](skills/odoo-house-rules/SKILL.md) | Opinionated rules for custom addons: file per model, naming (`_id`/`_ids`, `calculated` for computed fields), model layout, overrides, view inheritance, SCSS/JS pitfalls, checks before calling work done. |
 | [`doodba`](skills/doodba/SKILL.md) | How to do those steps in a [Doodba](https://github.com/Tecnativa/doodba-copier-template) project: `repos.yaml` / git-aggregator, `addons.yaml`, `click-odoo-update`, tests, translations. |
 

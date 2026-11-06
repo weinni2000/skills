@@ -278,6 +278,10 @@ The wiki lists framework changes only. For data-model changes of core modules se
 - Font Awesome icons (`icon="fa-…"`, `class="fa …"`) → Material Symbols: always
   `grep -rn 'fa-' <module>`; the upgrade-code scripts from step 2 convert them (e.g. `fa-link` →
   `link`).
+- x2many command tuples are replaced by `odoo.Command` (OCA review request, server-ux#1382):
+  `(0,0,vals)`→`Command.create(vals)`, `(4,id)`→`Command.link(id)`, `(3,id)`→`Command.unlink(id)`,
+  `(5,0,0)`→`Command.clear()` (no args), `(6,0,ids)`→`Command.set(ids)`; also `[[4, id]]` lists.
+  `grep -rnE "\(\s*[0-6]\s*,|\[\[[0-6]," <module> --include=*.py` and add `Command` to the import.
 - `ir.config_parameter.get_param` is gone: `get_str` / `get_int` / `get_bool` / `get_float`.
 
 ## Phase 4 — Migration commit

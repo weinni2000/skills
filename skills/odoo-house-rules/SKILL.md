@@ -5,9 +5,9 @@ description: >-
   naming per model, manifest versioning, field and variable naming
   (`_id`/`_ids`, `calculated` for computed fields), model layout, constraints,
   translations, view inheritance, hooks and method overrides, SCSS/JS
-  pitfalls, migrations, and the checks to run before calling work done. Use
-  when writing, refactoring or reviewing code in a custom (non-core) Odoo
-  addon.
+  pitfalls, migrations, SonarQube findings, and the checks to run before
+  calling work done. Use when writing, refactoring or reviewing code in a
+  custom (non-core) Odoo addon.
 ---
 
 # Odoo house rules
@@ -48,6 +48,11 @@ file's style when it consistently does something else.
   Loop variable over a generic recordset (server actions, `for record in self`): `record`; a typed
   item from a plural collection may mirror it (`for line_id in line_ids:`).
 - Never `print()`; use `_logger = logging.getLogger(__name__)`.
+- Log level by meaning: `_logger.warning` is fine in OCA, but a CI with checklog
+  (`OCA_ENABLE_CHECKLOG_ODOO`) fails the tests on any unexpected warning. Expected situations, such
+  as a record without the external ID to look up (e.g. no Wikidata QID), log at `info` or `debug`;
+  `warning` only for something an admin has to fix. A test that triggers a real warning on purpose
+  wraps it in `self.assertLogs(logger, "WARNING")`.
 - Imports at the top of the file, never inside a function.
 - String formatting: untranslated strings use f-strings (ruff UP031). Escape quotes with `\"`, never
   typographic quotes.
@@ -138,6 +143,80 @@ file's style when it consistently does something else.
 - Manifest version for a migrated/new module is `<odoo>.1.0.0` (OCA convention beats the `.1` rule).
 - Don't touch `readme/CREDITS*` or add contributors unless asked.
 - See `oca_migration_git` / `oca_pr_checks` for the git flow.
+
+## SonarQube
+
+Patterns SonarQube reported in custom addons. Write the code so they don't come up.
+
+- No credentials in code or data files, not even demo passwords or keys in standalone scripts
+  (S2068, S7013): read them from an untracked `.env` / the environment; without a value, skip the
+  step instead of falling back to a literal.
+- No debug switches: `if True:`, `if False:`, `if x or True:`, `flag = True` followed by
+  `if flag:` (S5797). Delete the dead branch and keep the code that runs.
+- No dead stores (S1854): don't assign a value that is overwritten before it is read
+  (`width = int(w * 1.3)` followed by `width = 832`), no self-assignments (S1656), no statements
+  without effect such as `"".join(...)` or `a / b` on their own (S905, S2201). Chains of
+  alternatives use `if/elif/else`: `if a: … if b: … else: …` overwrites the result of `a`.
+- No duplicate branches: the same condition twice in an `elif` chain (S1862), `if/else` with
+  identical bodies (S3923), duplicate keys in an object/dict literal (S1534) — only the last one
+  counts.
+- An empty function says why in a comment (registered hook, form button that only saves, disabled
+  feature) or is deleted when nothing uses it (S1186).
+- `except`: don't list a class next to its parent (S5713). `OSError` already covers `URLError`,
+  `TimeoutError` and `requests.RequestException`.
+- lxml on files or downloads: `etree.XMLParser(resolve_entities=False, no_network=True)` (S2755).
+- Logging: arguments match the placeholders, `_logger.warning("Skipped %s: %s", name, error)`
+  (S3457); never `_logger.warning(...) % {...}`. Log messages are not translated.
+- NaN: `math.isnan(value)`, not `value != value` (S1764).
+- JS: `forEach` when the result of `map` isn't used (S2201); `replaceAll()` for global regexes
+  (S7781); `sort((a, b) => a.localeCompare(b))` for strings (S2871); `await` only on async
+  functions — make placeholder methods `async` (S4123); keep a variable's type stable (`0`, not
+  `false`, for "no error code"; S3403).
+- JS, more: arrays only used with `includes()` are a `Set` (S7776); `a?.b` instead of `a && a.b`
+  (S6582, mind value positions: `a && a.b` returns `a`); arrow functions instead of
+  `const self = this` (S7740) — but keep a `function` whose own `this` matters (Leaflet control
+  methods, functions called as methods of a returned API object); `"x".replaceAll("&", ...)` with
+  a string instead of a one-character regex; `.at(-1)`; `node.remove()`; `Object.hasOwn()`; one
+  `push(a, b)` instead of two pushes; `null`, not `false`, for "no value" in plain JS helpers.
+- Python, more: no nested `if a:` + `if b:` without else (S1066), `!=` instead of `not a == b`
+  (S1940), no `continue` at the end of a loop body or before `elif` (S3626), no nested
+  conditional expressions (S3358), `{x for ...}` instead of `set(x for ...)` (S7494), no
+  `if x: pass else: ...` (S108) — invert the condition; `raise ValueError(...) from error`, not
+  `raise Exception(...)` (S112). A parameter that is overwritten before it is read is removed
+  or gets a differently named local (S1226).
+- Regex: no `^a|b$` (S5850) — two `re.sub()` calls, one per anchor; `\d` instead of `[0-9]`;
+  no group around a whole pattern (S6395). Generate long alternations from the mapping that
+  interprets the match (`"|".join(sorted(MONTHS, key=len, reverse=True))`), so they can't drift.
+- No sync file IO in `async` functions (S7493); debug dumps to fixed paths don't belong there at
+  all.
+- Don't commit copies (`* copy.js`, `*_old.py`): they are analysed like real code.
+
+Suppressions:
+
+- `# NOSONAR(<rule>)` (`// NOSONAR`) only for a false positive or an Odoo pattern, with the reason
+  in a comment. When the line already has a linter exception for the same thing, add it as its own
+  comment in front of it, `def sitemap_forum(env, rule, qs):  # NOSONAR(S5720)  # noqa: B902`
+  (Odoo calls sitemap functions without `self`). `# noqa: B902 NOSONAR` is invalid syntax (S7632)
+  and suppresses nothing.
+- Rules that don't apply to Odoo go into `sonar.issue.ignore.multicriteria` in
+  `sonar-project.properties`, with the reason in a comment **on its own line**: `.properties` files
+  have no inline comments, `ruleKey=python:S1481 # reason` silently never matches. Ignored with
+  reason: S1172 (Odoo fixes the signatures of `migrate`, hooks, overrides, routes), S100 (Odoo /
+  unittest method names), S6890 (Odoo uses `pytz`), S6903 (Odoo datetimes are naive UTC), S3776
+  (already ruff C901), commented-out code S125 (already ruff ERA),
+  S7785 (no top-level `await` in Odoo JS modules, they are transpiled into `odoo.define()`).
+- Known false positives, NOSONAR with reason: S7729 on Leaflet's `L.map()`; S7784 on
+  `JSON.parse(JSON.stringify(x))` of an Owl `reactive` proxy (`structuredClone()` throws on
+  proxies); S7760 when Odoo can send `false` (a default parameter only covers `undefined`);
+  S6019 on a lazy quantifier followed by `(?:…|$)`; S5857 when `[^}]*` would break on nested
+  JSON; S7503 on an async test mock. Test such regexes before calling them false positives.
+- NOSONAR goes on the reported line itself. prettier and ruff-format move a trailing comment of a
+  wrapped statement onto its own line, where it suppresses nothing: restructure the statement so
+  it fits on one line (a small helper function, a separate `setView()` call, adjacent string
+  literals in Python) and check `git diff | grep "^+\s*// NOSONAR"` after formatting.
+- Exclude third-party or vendored code (`sonar.exclusions`) instead of changing it: third-party
+  modules, `libs/`, minified or generated files, copied stylesheets (Leaflet, Esri), code derived
+  from upstream projects.
 
 ## Before calling it done
 

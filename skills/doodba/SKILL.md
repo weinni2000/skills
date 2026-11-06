@@ -100,10 +100,18 @@ docker compose run --rm odoo odoo upgrade_code --from 19.0 \
 
 ## Translations
 
-- `invoke updatepot --module=<module>` runs `click-odoo-makepot` in the container: writes the POT
-  and merges it into existing `.po` files (`--repo=<repo>` for a whole repo). It stops odoo.
-- Alternative (Odoo 19+): `docker compose run --rm odoo odoo i18n export -d devel <module>`.
-- After adding a `.po`: update the module (model terms) and restart (JS terms are cached).
+Follow the `odoo-translations` skill; the doodba way of its steps:
+
+- Export the POT from the running container (Odoo 19+), without touching the module folder:
+  `docker compose exec -T odoo odoo i18n export -d devel -l pot -o - <module> 2>/dev/null > /tmp/<module>.pot`
+  (`-o -` writes to stdout; update the module first if model strings changed).
+- Then merge and fill on the host with that skill's `po_tool.py` (`merge`, `todo`, `fill`).
+- `invoke updatepot --module=<module>` (`click-odoo-makepot`) is the alternative: it writes the POT
+  and merges it into the existing `.po` files with `msgmerge` (`--repo=<repo>` for a whole repo).
+  It stops odoo.
+- After changing a `.po`: update the module (model terms), then **restart** odoo
+  (`docker compose restart odoo`): the frontend translations stay cached otherwise, even after
+  `click-odoo-update`.
 
 ## Getting code: git-aggregator
 

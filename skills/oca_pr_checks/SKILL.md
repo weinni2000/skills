@@ -118,6 +118,13 @@ Confirm the same errors appear before fixing.
   `oca_migration_git` skill, Phase 5) and update fork + OCA PR with
   `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@<body.md>` (`gh pr edit` may fail with a
   Projects-classic GraphQL error).
+- Reviewer asks to "squash the administrative commits" (bot `.pot`/`[BOT] post-merge`/Weblate
+  commits replayed from the previous version), see the OCA wiki
+  https://github.com/OCA/maintainer-tools/wiki/Merge-commits-in-pull-requests#mergesquash-the-commits-generated-by-bots-or-weblate:
+  turn each into a `fixup` of the commit before it with the `GIT_SEQUENCE_EDITOR` rebase from the
+  `oca_migration_git` skill ("Squash administrative commits"). Rebase from the module's first commit
+  (not `origin/<target>`) so older commits keep their SHAs, check `git diff <old_head> HEAD` is
+  empty, force-push, and comment on the PR that the commits are squashed.
 - `gh pr checks <pr> -R OCA/<repo>` to confirm the new run started; report results honestly (pending /
   passed / failed).
 
